@@ -1,0 +1,87 @@
+{
+  "styleSuffix": "fantasy trading card art, painterly thick brushstrokes, Blizzard Hearthstone concept art style, dramatic cinematic rim light, glowing key light, dark vignette background, centered single subject, semi-realistic stylized, rich saturated color, volumetric atmosphere, highly detailed, sharp focus on subject",
+  "negative": "text, words, letters, title, caption, watermark, signature, logo, frame, border, card frame, UI, user interface, health bar, mana crystal, icons, photo, photorealistic, photograph, realistic skin pores, anime, manga, cartoon lineart, cel shading, flat colors, sketch, low quality, worst quality, blurry, out of focus, deformed, disfigured, bad anatomy, extra limbs, extra fingers, fused fingers, mutated hands, cropped, cut off, oversaturated, washed out, flat lighting, plain background, grid, collage, multiple panels",
+  "sampler": "DPM++ SDE Karras",
+  "steps": 8,
+  "cfg": 2,
+  "width": 768,
+  "height": 768,
+  "board": {
+    "prompt": "A dark fantasy battle arena tabletop forged from carved grey stone and aged iron-banded wood, a glowing molten lava rift cracking straight down the middle and splitting the board into two halves, wide panoramic horizontal battlefield, flickering torches mounted along the far edges, wisps of smoke and drifting orange embers rising from the fissure, an empty open central playing field with no creatures, moody warm-versus-cold lighting, deep atmospheric perspective, elevated three-quarter overhead view of an epic arena",
+    "seed": 101010
+  },
+  "heroes": [
+    {
+      "id": "HERO_MAGE",
+      "prompt": "An arcane human mage hero portrait, wearing a deep-hooded flowing blue robe embroidered with glowing runic sigils, one hand raising a tall wooden staff crowned with a radiant blue arcane crystal, swirling ribbons of azure magical energy and floating motes around him, confident wise commanding expression, cool blue magic glow lighting his face against a dark stormy void",
+      "seed": 202021
+    },
+    {
+      "id": "HERO_PALADIN",
+      "prompt": "A holy human paladin hero portrait, clad head to toe in gleaming ornate golden plate armor with engraved wings and filigree, both hands gripping a heavy blessed warhammer resting head-down, bathed in warm radiant divine light with floating golden sparks and a faint halo, noble resolute heroic stance against a dark cathedral gloom",
+      "seed": 202022
+    }
+  ],
+  "cards": [
+    {
+      "cardId": "MURLOC",
+      "prompt": "A murloc tidehunter, a blue-green scaled fish humanoid standing on slick wet rocks, webbed clawed hands gripping a jagged barbed bone spear, bulging round yellow eyes and a wide gaping tooth-lined mouth, glistening slimy skin and finned crest, dripping seawater, moody teal underwater god-rays cutting through the gloom",
+      "seed": 300001
+    },
+    {
+      "cardId": "MURLOC_SCOUT",
+      "prompt": "A small young murloc scout, a timid little blue-green scaled fish creature with an oversized head and huge wide innocent glossy eyes, clutching a tiny crude rusty dagger in both webbed hands, hunched low and alert, twitching fins, faint coastal mist and soft rim light on its wet skin",
+      "seed": 300002
+    },
+    {
+      "cardId": "BOLT",
+      "prompt": "A crackling arrow of forked brilliant blue lightning streaking diagonally through roiling dark thunderclouds, jagged electric arcs and stray sparks trailing behind it, intense motion streak, glowing cyan-white energy core illuminating the storm, raw kinetic magical bolt with no caster visible",
+      "seed": 300003
+    },
+    {
+      "cardId": "WOLFRIDER",
+      "prompt": "A muscular green-skinned orc warrior riding a snarling grey dire wolf at a full charge, a heavy battle axe raised high overhead mid-swing, wolf fangs bared and fur bristling, dust and debris kicked up beneath pounding paws, fierce roaring war cry, dynamic diagonal action pose",
+      "seed": 300004
+    },
+    {
+      "cardId": "GUNNER",
+      "prompt": "A stout dwarven rifleman of Ironforge, thick braided ginger beard and heavy studded leather-and-steel armor, shouldering and aiming a long ornate engraved musket down the barrel with one eye squinting, wisp of powder smoke at the muzzle, warm forge-glow lighting on his weathered face",
+      "seed": 300005
+    },
+    {
+      "cardId": "BOMBER",
+      "prompt": "A crazed grinning goblin with wild bulging eyes and pointed ears, green skin and tattered leather straps, hugging two lit round black cannonball bombs to his chest, short fuses sparking and hissing with flying sparks, manic gleeful unhinged expression, warm firelight from the burning fuses",
+      "seed": 300006
+    },
+    {
+      "cardId": "GRIZZLY",
+      "prompt": "A massive iron-furred grizzly bear rearing up and roaring, bristling coarse metallic steel-grey coat, bared yellow fangs and long claws swiping, standing amid a snowy pine forest, frosty breath steaming from its jaws, cold blue winter light with dramatic contrast",
+      "seed": 300007
+    },
+    {
+      "cardId": "HARVESTER",
+      "prompt": "A hulking mechanical harvester golem, riveted rusted iron plating and massive spinning circular saw-blade arms, a glowing orange furnace core in its chest, venting jets of steam and black smoke, heavy menacing industrial war-machine looming forward, sparks and grinding metal",
+      "seed": 300008
+    },
+    {
+      "cardId": "PART",
+      "prompt": "A small rickety spare-parts robot cobbled together from mismatched scrap metal, loose bolts and dangling wires, a single large round glowing amber eye lens, one arm longer than the other, sparks fizzing from a loose joint, comically ramshackle and endearing, soft warm workshop glow",
+      "seed": 300009
+    },
+    {
+      "cardId": "FIREBALL",
+      "prompt": "A roaring fireball of molten orange and white-hot flame hurtling forward, dense swirling incandescent core, long trailing tongues of fire, showering embers and sparks with billowing black smoke behind, intense radiant heat haze and glow, pure explosive spell with no caster",
+      "seed": 300010
+    },
+    {
+      "cardId": "YETI",
+      "prompt": "A chillwind yeti, a hulking hunched beast covered in thick shaggy icy-white fur crusted with frost and icicles, glowing pale-blue eyes and a broad flat face, massive clawed arms spread wide, standing in a howling blizzard of blowing snow, cold cyan light with drifting snowflakes",
+      "seed": 300011
+    },
+    {
+      "cardId": "SENJIN",
+      "prompt": "A jungle troll shieldmaster with lanky blue-grey limbs, a tall red mohawk and prominent curved tusks, bracing a huge round reinforced iron-rimmed wooden shield forward in a solid defensive stance, tribal war paint and bone jewelry, stern battle-ready glare, torchlit rim light",
+      "seed": 300012
+    }
+  ]
+}
