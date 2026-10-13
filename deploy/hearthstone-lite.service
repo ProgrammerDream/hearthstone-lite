@@ -1,0 +1,32 @@
+# systemd unit：炉石简化版联机对战服务端
+# 安装：sudo install -m 644 deploy/hearthstone-lite.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable --now hearthstone-lite
+[Unit]
+Description=Hearthstone Lite online battle server (Node.js + WebSocket)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/apps/hearthstone-lite
+Environment=NODE_ENV=production
+Environment=HOST=0.0.0.0
+Environment=PORT=8787
+Environment=TURN_SECONDS=75
+Environment=RECONNECT_GRACE_SECONDS=60
+Environment=ROOM_RETENTION_SECONDS=120
+Environment=LOG_DIR=/home/ubuntu/apps/hearthstone-lite/logs
+ExecStart=/usr/local/bin/node server/index.js
+Restart=always
+RestartSec=2
+# 小机器（2 核 4G）上与其它服务共存：限内存，不要特权
+MemoryMax=512M
+NoNewPrivileges=true
+PrivateTmp=true
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=hearthstone-lite
+
+[Install]
+WantedBy=multi-user.target
