@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>炉石简化版 · 联机对战</title>
+<style>
+/* ============================================================
+   石雕木纹 · 经典炉石视觉系统（二期）
+   纯 CSS/SVG；插画由 Forge 出图后写入 --art 贴入插画窗口(::before)
+   类型判定：:has(.catk)=随从，:not(:has(.catk))=法术，引擎不改
+   ============================================================ */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root{
+  --stone-hi:#8b7a5e; --stone:#5c4d3a; --stone-lo:#332a1e;
+  --wood-hi:#6e4a2b;  --wood:#472d19;  --wood-lo:#281809;
+  --gold-hi:#f6e3a6;  --gold:#c99a2e;  --gold-lo:#7c5c17;
+  --torch:#ff9a3c; --torch-hi:#ffc271; --torch-glow:rgba(255,150,60,.45);
+  --mana-hi:#7fd0ff; --mana:#2f7fd4; --mana-lo:#123a63;
+  --atk-hi:#ffe08a;  --atk:#dca63a;   --atk-lo:#8a5e10;
+  --hp-hi:#ff8f7d;   --hp:#c0342e;    --hp-lo:#5a1410;
+  --parch:#ecdcae; --parch-lo:#c9b27e; --ink:#2a1c0e;
+  --arc-hi:#b79cff; --arc:#5b3fb0; --arc-lo:#1c1038;
+  --arc-parch:#d9d2f2; --arc-ink:#241844;
+  --playable:#57e08a; --target:#ff4d4d; --frost:#bfe9ff;
+  --rare:#e8eef4; --rare-glow:rgba(232,238,244,.55);
+  --art:none;
+}
+body{
+  font-family:"Microsoft YaHei","PingFang SC",sans-serif; color:#f0e6d4;
+  background:radial-gradient(ellipse at 50% 34%, #2c2118 0%, #171009 70%, #0d0805 100%);
+  height:100vh; display:flex; overflow:hidden; user-select:none;
+}
+#game{ flex:1; display:flex; flex-direction:column; padding:6px 14px; max-width:960px; margin:0 auto; min-width:0; }
+.side-bar{ display:flex; align-items:center; gap:14px; padding:4px 0; min-height:82px; }
+.hand-row{ display:flex; justify-content:center; gap:8px; min-height:132px; align-items:flex-end; padding:4px 0; flex:1; }
+
+/* 战场竞技场：贴 board.png，压暗保证随从对比 */
+#arena{
+  position:relative; border-radius:14px; margin:2px 0; overflow:hidden;
+  box-shadow:inset 0 0 40px rgba(0,0,0,.7), 0 2px 8px rgba(0,0,0,.5);
+}
+#arena::before{
+  content:""; position:absolute; inset:0; z-index:0;
+  background:var(--board) center/cover no-repeat;   /* 由 JS 经 artSrc('board') 注入，dev=文件/dist=data URI */
+  opacity:.55;
+}
+#arena::after{
+  content:""; position:absolute; inset:0; z-index:0;
+  background:linear-gradient(180deg, rgba(10,6,3,.55), rgba(10,6,3,.15) 50%, rgba(10,6,3,.55));
+}
+.board-row{
+  position:relative; z-index:1;
+  display:flex; justify-content:center; align-items:center; gap:10px;
+  min-height:108px; padding:6px 0;
+}
+
+#turn-info{
+  position:relative; z-index:1; text-align:center; font-size:13px; font-weight:700;
+  color:#ffd6a3; letter-spacing:1px; padding:5px 0; text-shadow:0 1px 3px #000;
+  background:linear-gradient(90deg, transparent, rgba(80,52,26,.5) 18%,
+            rgba(255,150,60,.28) 50%, rgba(80,52,26,.5) 82%, transparent);
+  border-top:1px solid rgba(255,180,100,.35); border-bottom:1px solid rgba(0,0,0,.55);
+  box-shadow:0 0 22px var(--torch-glow), inset 0 1px 0 rgba(255,200,120,.25);
+  animation:torch 3.4s ease-in-out infinite;
+}
+@keyframes torch{
+  0%,100%{ box-shadow:0 0 18px var(--torch-glow), inset 0 1px 0 rgba(255,200,120,.25); }
+  50%    { box-shadow:0 0 30px rgba(255,150,60,.6), inset 0 1px 0 rgba(255,210,140,.4); }
+}
+
+/* ---------- 英雄框 ---------- */
+.hero{
+  position:relative; width:104px; height:90px; flex-shrink:0; overflow:visible;
+  border-radius:12px 12px 10px 10px; text-align:center;
+  background:
+    radial-gradient(120% 80% at 50% -6%, rgba(255,220,160,.18), transparent 55%),
+    repeating-linear-gradient(93deg, rgba(0,0,0,.16) 0 2px, transparent 2px 7px, rgba(255,190,120,.04) 7px 9px, transparent 9px 15px),
+    linear-gradient(158deg, var(--wood-hi), var(--wood) 45%, var(--wood-lo));
+  box-shadow:
+    inset 0 0 0 2px var(--gold-lo), inset 0 0 0 3px rgba(0,0,0,.45),
+    inset 0 2px 4px rgba(255,215,150,.28), inset 0 -8px 12px rgba(0,0,0,.5),
+    0 5px 10px rgba(0,0,0,.6);
+}
+.hero::before{
+  content:""; position:absolute; top:6px; left:50%; transform:translateX(-50%);
+  width:82px; height:60px; z-index:1;
+  border-radius:14px 14px 22px 22px / 12px 12px 26px 26px;
+  background-color:#22303c;
+  background-image:var(--art,none), radial-gradient(circle at 50% 30%, #48596b, #1f2b36 78%);
+  background-size:cover; background-position:center 22%;
+  box-shadow:inset 0 0 0 2px #6b5330, inset 0 0 0 3px rgba(0,0,0,.55), inset 0 -8px 12px rgba(0,0,0,.5);
+}
+.hero .hname{
+  position:absolute; bottom:3px; left:3px; right:3px; z-index:4;
+  font-size:11px; font-weight:800; color:#fff3d6; letter-spacing:.4px; text-shadow:0 1px 1px #000;
+  background:linear-gradient(180deg, rgba(74,47,24,.95), rgba(40,25,12,.95));
+  border-top:1px solid rgba(246,227,166,.5); border-radius:4px; padding:1px 2px;
+  box-shadow:0 1px 2px rgba(0,0,0,.5);
+}
+.hero .hhp{
+  position:absolute; bottom:-8px; right:-8px; z-index:7;
+  min-width:30px; height:28px; padding:0 7px; border-radius:14px;
+  display:flex; align-items:center; justify-content:center; white-space:nowrap;
+  font-size:15px; font-weight:900; color:#fff;
+  background:radial-gradient(circle at 35% 25%, var(--hp-hi), var(--hp) 55%, var(--hp-lo));
+  box-shadow:inset 0 1px 2px rgba(255,255,255,.45), inset 0 -2px 4px rgba(0,0,0,.5),
+             0 2px 5px rgba(0,0,0,.65), 0 0 0 2px #3a0e0a;
+  text-shadow:0 1px 2px #4a0f0a, 0 0 5px #000;
+}
+.hero.targetable{ cursor:crosshair; box-shadow:0 5px 10px rgba(0,0,0,.6), 0 0 0 3px rgba(255,77,77,.85), 0 0 18px rgba(255,77,77,.6); }
+
+.stat-col{ display:flex; flex-direction:column; gap:2px; min-width:74px; }
+.mana-bar{ font-size:13px; font-weight:700; color:#cfe6fb; text-shadow:0 1px 2px #000; }
+.mana-bar .dot{ color:#5fb8ff; text-shadow:0 0 4px #2f7fd4, 0 0 8px rgba(47,127,212,.8); }
+.mana-bar .dot.empty{ color:#2a4258; text-shadow:none; }
+.deck-info{ font-size:12px; color:#c9b48a; text-shadow:0 1px 1px #000; }
+
+/* ============================================================ 卡牌基座 ============================================================ */
+.card{
+  position:relative; width:88px; height:122px; flex-shrink:0;
+  border:none; border-radius:12px 12px 11px 11px;
+  transition:transform .12s ease, box-shadow .18s ease, filter .18s ease;
+}
+/* ---- 随从卡（:has(.catk)）暖木金框 ---- */
+.card:has(.catk){
+  background:
+    radial-gradient(120% 70% at 50% -8%, rgba(255,220,160,.20), transparent 55%),
+    radial-gradient(70% 45% at 22% 96%, rgba(0,0,0,.4), transparent 70%),
+    repeating-linear-gradient(93deg, rgba(0,0,0,.15) 0 2px, transparent 2px 7px, rgba(255,190,120,.045) 7px 9px, transparent 9px 15px),
+    linear-gradient(158deg, var(--wood-hi), var(--wood) 46%, var(--wood-lo));
+  box-shadow:
+    inset 0 0 0 2px var(--gold-lo), inset 0 0 0 3px rgba(0,0,0,.5),
+    inset 0 2px 4px rgba(255,215,150,.30), inset 0 -10px 16px rgba(0,0,0,.5),
+    0 6px 12px rgba(0,0,0,.6), 0 1px 0 rgba(255,220,160,.12);
+}
+.card:has(.catk)::before{
+  content:""; position:absolute; top:8px; left:8px; right:8px; height:56px; z-index:1;
+  border-radius:6px 6px 5px 5px; background-color:#22303c;
+  background-image:var(--art,none), radial-gradient(circle at 50% 32%, #48596b, #202c37 76%);
+  background-size:cover; background-position:center 26%;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.65), inset 0 2px 6px rgba(0,0,0,.45), inset 0 -10px 16px rgba(0,0,0,.55);
+}
+.card:has(.catk)::after{
+  content:""; position:absolute; inset:3px; z-index:6; border-radius:9px;
+  border:1px solid rgba(246,227,166,.42);
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.4), inset 0 0 9px rgba(255,200,120,.14);
+  pointer-events:none;
+}
+/* 费用蓝晶 */
+.card .cost{
+  position:absolute; top:-8px; left:-8px; width:28px; height:28px; z-index:9;
+  clip-path:polygon(50% 0,100% 27%,100% 73%,50% 100%,0 73%,0 27%);
+  background:linear-gradient(150deg, var(--mana-hi), var(--mana) 48%, var(--mana-lo));
+  display:flex; align-items:center; justify-content:center; line-height:1;
+  font-size:15px; font-weight:900; color:#fff;
+  text-shadow:0 1px 2px #06284a, 0 0 6px #0a3a6e;
+  filter:drop-shadow(0 2px 3px rgba(0,0,0,.7));
+}
+.card:has(.catk) .cname{
+  position:absolute; top:57px; left:2px; right:2px; z-index:5; margin:0; padding:2px 4px;
+  text-align:center; font-size:11px; font-weight:800; color:#fff3d6; letter-spacing:.3px;
+  text-shadow:0 1px 1px #000, 0 0 4px rgba(0,0,0,.5);
+  background:linear-gradient(180deg,#5a3a1e,#331f0e);
+  border-top:1px solid rgba(246,227,166,.55); border-bottom:1px solid rgba(0,0,0,.55);
+  border-radius:3px; box-shadow:0 1px 3px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,205,130,.22);
+}
+.card .cname::before{
+  content:""; position:absolute; top:-7px; left:50%; transform:translateX(-50%) rotate(45deg);
+  width:11px; height:11px; border-radius:2px; z-index:7;
+  background:radial-gradient(circle at 35% 30%, #ffffff, var(--rare) 62%, rgba(0,0,0,.35));
+  box-shadow:0 0 7px var(--rare-glow), inset 0 0 2px rgba(0,0,0,.5), 0 0 0 1px rgba(0,0,0,.45);
+}
+.card:has(.catk) .ctext{
+  position:absolute; top:74px; left:6px; right:6px; bottom:14px; z-index:4; margin:0;
+  padding:3px 4px; overflow:hidden; font-size:9px; line-height:1.28; text-align:center; color:var(--ink);
+  background:
+    radial-gradient(circle at 50% -10%, rgba(255,255,255,.5), transparent 65%),
+    linear-gradient(180deg, var(--parch), var(--parch-lo));
+  border:1px solid rgba(92,62,22,.6); border-radius:4px;
+  box-shadow:inset 0 0 6px rgba(120,80,30,.45), inset 0 1px 0 rgba(255,255,255,.5), 0 1px 2px rgba(0,0,0,.4);
+}
+.card .catk, .card .chp{
+  position:absolute; bottom:-8px; width:28px; height:28px; z-index:9;
+  display:flex; align-items:center; justify-content:center; line-height:1;
+  font-size:15px; font-weight:900; color:#fff;
+}
+.card .catk{
+  left:-8px; border-radius:50%; color:#fff8e0;
+  background:radial-gradient(circle at 34% 28%, var(--atk-hi), var(--atk) 56%, var(--atk-lo));
+  box-shadow:inset 0 1px 2px rgba(255,255,255,.55), inset 0 -2px 4px rgba(0,0,0,.45),
+             0 2px 4px rgba(0,0,0,.6), 0 0 0 2px #3a2a08;
+  text-shadow:0 1px 2px #4a2f00, 0 0 4px #000;
+}
+.card .chp{
+  right:-8px; border-radius:50% 50% 50% 50% / 42% 42% 58% 58%;
+  background:radial-gradient(circle at 34% 26%, var(--hp-hi), var(--hp) 56%, var(--hp-lo));
+  box-shadow:inset 0 1px 2px rgba(255,255,255,.5), inset 0 -2px 4px rgba(0,0,0,.45),
+             0 2px 4px rgba(0,0,0,.6), 0 0 0 2px #3a0e0a;
+  text-shadow:0 1px 2px #4a0f0a, 0 0 4px #000;
+}
+.card .chp[data-damaged="1"]{
+  color:#ffdad5;
+  background:radial-gradient(circle at 34% 26%, #ffb3aa, #e0362d 55%, var(--hp-lo));
+  box-shadow:inset 0 1px 2px rgba(255,255,255,.6), inset 0 -2px 4px rgba(0,0,0,.45),
+             0 2px 4px rgba(0,0,0,.6), 0 0 0 2px #3a0e0a, 0 0 8px rgba(255,60,50,.7);
+}
+/* 稀有度 */
+.card.rarity-common   { --rare:#e8eef4; --rare-glow:rgba(232,238,244,.55); }
+.card.rarity-rare     { --rare:#3d8bff; --rare-glow:rgba(61,139,255,.7); }
+.card.rarity-epic     { --rare:#c06bff; --rare-glow:rgba(192,107,255,.75); }
+.card.rarity-legendary{ --rare:#ff9a1a; --rare-glow:rgba(255,154,26,.85); }
+.card.rarity-epic:has(.catk){
+  box-shadow:
+    inset 0 0 0 2px var(--gold-lo), inset 0 0 0 3px rgba(0,0,0,.5),
+    inset 0 2px 4px rgba(255,215,150,.30), inset 0 -10px 16px rgba(0,0,0,.5),
+    0 6px 12px rgba(0,0,0,.6), 0 0 12px rgba(150,80,220,.4);
+}
+.card.rarity-legendary:has(.catk){
+  box-shadow:
+    inset 0 0 0 2px var(--gold), inset 0 0 0 3px rgba(0,0,0,.5),
+    inset 0 2px 4px rgba(255,225,160,.4), inset 0 -10px 16px rgba(0,0,0,.5),
+    0 6px 12px rgba(0,0,0,.6), 0 0 16px rgba(255,150,40,.45);
+}
+.card.rarity-legendary .cname::after{
+  content:"★"; position:absolute; top:50%; left:3px; transform:translateY(-50%);
+  font-size:9px; color:var(--gold-hi); text-shadow:0 0 5px rgba(255,154,26,.9); z-index:8;
+}
+/* ---- 法术卡（:not(:has(.catk))）尖顶奥术紫框 ---- */
+.card:not(:has(.catk)){
+  border-radius:22px 22px 11px 11px;
+  background:
+    radial-gradient(120% 70% at 50% -10%, rgba(150,120,255,.28), transparent 55%),
+    radial-gradient(70% 45% at 22% 96%, rgba(0,0,0,.45), transparent 70%),
+    repeating-linear-gradient(93deg, rgba(0,0,0,.18) 0 2px, transparent 2px 7px, rgba(150,120,255,.06) 7px 9px, transparent 9px 15px),
+    linear-gradient(158deg, #3b2c62, #241844 46%, var(--arc-lo));
+  box-shadow:
+    inset 0 0 0 2px #4a3a86, inset 0 0 0 3px rgba(0,0,0,.5),
+    inset 0 2px 5px rgba(180,150,255,.3), inset 0 -10px 18px rgba(10,4,26,.6),
+    0 6px 12px rgba(0,0,0,.6), 0 0 12px rgba(120,80,220,.22);
+}
+.card:not(:has(.catk)) .cost{
+  background:linear-gradient(150deg, var(--arc-hi), var(--arc) 48%, var(--arc-lo));
+  text-shadow:0 1px 2px #150a30, 0 0 6px #3a1d7a;
+}
+.card:not(:has(.catk))::before{
+  content:""; position:absolute; top:9px; left:8px; right:8px; height:54px; z-index:1;
+  border-radius:26px 26px 8px 8px / 22px 22px 8px 8px; background-color:#241a3c;
+  background-image:var(--art,none), radial-gradient(circle at 50% 30%, #5a4a8f, #201638 78%);
+  background-size:cover; background-position:center 26%;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.6), inset 0 2px 6px rgba(60,30,120,.5),
+             inset 0 -10px 16px rgba(10,4,26,.6), 0 0 10px rgba(130,90,230,.25);
+}
+.card:not(:has(.catk))::after{
+  content:""; position:absolute; inset:3px; z-index:6; border-radius:19px 19px 9px 9px;
+  border:1px solid rgba(183,156,255,.45);
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.4), inset 0 0 9px rgba(150,110,255,.18);
+  pointer-events:none;
+}
+.card:not(:has(.catk)) .cname{
+  position:absolute; top:56px; left:2px; right:2px; z-index:5; margin:0; padding:2px 4px;
+  text-align:center; font-size:11px; font-weight:800; color:#efe8ff; letter-spacing:.3px;
+  text-shadow:0 1px 1px #000, 0 0 5px rgba(120,80,220,.6);
+  background:linear-gradient(180deg,#3a2c66,#1d1338);
+  border-top:1px solid rgba(183,156,255,.55); border-bottom:1px solid rgba(0,0,0,.55);
+  border-radius:3px; box-shadow:0 1px 3px rgba(0,0,0,.5), inset 0 1px 0 rgba(160,130,255,.25);
+}
+.card:not(:has(.catk)) .ctext{
+  position:absolute; top:73px; left:6px; right:6px; bottom:8px; z-index:4; margin:0;
+  padding:3px 4px; overflow:hidden; font-size:9px; line-height:1.3; text-align:center; color:var(--arc-ink);
+  background:
+    radial-gradient(circle at 50% -10%, rgba(255,255,255,.55), transparent 65%),
+    linear-gradient(180deg, var(--arc-parch), #b8afe0);
+  border:1px solid rgba(60,40,110,.6); border-radius:4px;
+  box-shadow:inset 0 0 6px rgba(70,40,140,.35), inset 0 1px 0 rgba(255,255,255,.6), 0 1px 2px rgba(0,0,0,.4);
+}
+
+/* ============================================================ 交互态 ============================================================ */
+.card.playable{ cursor:pointer; animation:playable-bob 1.8s ease-in-out infinite; }
+.card.playable:has(.catk){
+  box-shadow:
+    inset 0 0 0 2px var(--gold-lo), inset 0 0 0 3px rgba(0,0,0,.5),
+    inset 0 2px 4px rgba(255,215,150,.30), inset 0 -10px 16px rgba(0,0,0,.5),
+    0 6px 12px rgba(0,0,0,.6),
+    0 0 0 2px rgba(87,224,138,.9), 0 0 14px rgba(87,224,138,.6);
+}
+.card.playable:not(:has(.catk)){
+  box-shadow:
+    inset 0 0 0 2px #4a3a86, inset 0 0 0 3px rgba(0,0,0,.5),
+    inset 0 2px 5px rgba(180,150,255,.3), inset 0 -10px 18px rgba(10,4,26,.6),
+    0 6px 12px rgba(0,0,0,.6),
+    0 0 0 2px rgba(87,224,138,.9), 0 0 14px rgba(87,224,138,.6);
+}
+@keyframes playable-bob{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-6px); } }
+
+.card.selected{
+  transform:translateY(-10px) scale(1.06); z-index:20;
+  box-shadow:
+    inset 0 0 0 2px var(--gold), inset 0 0 0 3px rgba(0,0,0,.5),
+    0 10px 20px rgba(0,0,0,.7),
+    0 0 0 3px var(--gold-hi), 0 0 20px rgba(246,227,166,.75);
+}
+.card.targetable, .hero.targetable{ cursor:crosshair; }
+.card.targetable{
+  box-shadow:0 6px 12px rgba(0,0,0,.6), 0 0 0 3px rgba(255,77,77,.85), 0 0 16px rgba(255,77,77,.6);
+  animation:target-pulse 1s ease-in-out infinite;
+}
+@keyframes target-pulse{
+  0%,100%{ box-shadow:0 6px 12px rgba(0,0,0,.6), 0 0 0 2px rgba(255,77,77,.55), 0 0 10px rgba(255,77,77,.4); }
+  50%    { box-shadow:0 6px 12px rgba(0,0,0,.6), 0 0 0 3px rgba(255,77,77,.95), 0 0 20px rgba(255,77,77,.8); }
+}
+.card.disabled{ filter:saturate(.55) brightness(.72); cursor:default; }
+.card:not(.disabled):hover{ transform:translateY(-6px) scale(1.03); z-index:15; }
+
+/* ---- 战场随从：复用随从样式，尺寸略小，隐藏说明 ---- */
+.card.minion{ width:80px; height:100px; }
+.card.minion .ctext{ display:none; }
+.card.minion:has(.catk)::before{ height:52px; }
+.card.minion .cname{ top:54px; font-size:10px; }
+.card.minion .catk, .card.minion .chp{ bottom:-7px; width:26px; height:26px; font-size:14px; }
+.card.minion:not(.disabled):hover{ transform:translateY(-4px); }
+.card.minion.can-attack{
+  cursor:pointer;
+  box-shadow:
+    inset 0 0 0 2px var(--gold-lo), inset 0 0 0 3px rgba(0,0,0,.5),
+    inset 0 2px 4px rgba(255,215,150,.30), inset 0 -10px 16px rgba(0,0,0,.5),
+    0 6px 12px rgba(0,0,0,.6), 0 0 12px rgba(87,224,138,.6);
+}
+.card.minion.summoning-sick{ filter:brightness(.82) saturate(.8); }
+/* 嘲讽石盾环（独立元素，避开 ::after 金饰线） */
+.card .taunt-shield{
+  position:absolute; inset:-7px; z-index:0; border-radius:16px;
+  background:conic-gradient(from 0deg, #6b5a42, #3a2f22, #6b5a42, #3a2f22, #6b5a42);
+  -webkit-mask:radial-gradient(circle, transparent 60%, #000 62%);
+          mask:radial-gradient(circle, transparent 60%, #000 62%);
+  filter:drop-shadow(0 0 6px rgba(0,0,0,.8)); pointer-events:none;
+}
+
+/* ---------- 卡背 ---------- */
+.cardback{
+  width:58px; height:82px; border-radius:9px; flex-shrink:0;
+  background:
+    radial-gradient(circle at 50% 40%, rgba(255,180,100,.25), transparent 60%),
+    repeating-linear-gradient(45deg, #3a2a18 0 6px, #251a0f 6px 12px);
+  border:2px solid var(--gold-lo);
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.5), inset 0 0 8px rgba(255,180,100,.2), 0 2px 5px rgba(0,0,0,.5);
+}
+
+/* ---------- 底栏按钮 ---------- */
+#bottom-bar{ display:flex; justify-content:center; gap:12px; padding:6px 0; }
+button{
+  padding:8px 22px; font-size:15px; font-weight:700; font-family:inherit; color:#fff3d6;
+  border-radius:8px; border:2px solid var(--gold-lo); cursor:pointer;
+  background:linear-gradient(180deg, #6e4a2b, #3a2413);
+  box-shadow:inset 0 1px 0 rgba(255,205,130,.35), 0 2px 6px rgba(0,0,0,.5); text-shadow:0 1px 2px #000;
+}
+button:hover:not(:disabled){ background:linear-gradient(180deg, #855a34, #4a2f18); box-shadow:inset 0 1px 0 rgba(255,205,130,.5), 0 0 12px var(--torch-glow); }
+button:disabled{ opacity:.4; cursor:not-allowed; }
+
+/* ---------- 战斗日志 ---------- */
+#log{ width:240px; background:linear-gradient(180deg, #1a120a, #0d0805); border-left:2px solid var(--wood-lo);
+      font-size:12px; overflow-y:auto; padding:8px 10px; line-height:1.7; color:#d9c7a4; }
+#log .turn-mark{ color:#ffd75a; margin-top:4px; font-weight:700; text-shadow:0 0 6px rgba(255,150,60,.5); }
+
+/* ---------- 全屏遮罩 ---------- */
+.overlay{ position:fixed; inset:0; background:rgba(10,6,3,.82); display:flex; flex-direction:column;
+          justify-content:center; align-items:center; gap:18px; z-index:100; backdrop-filter:blur(3px); }
+.overlay h1{ font-size:32px; color:#ffd6a3; text-shadow:0 2px 8px #000, 0 0 20px var(--torch-glow); letter-spacing:2px; }
+.overlay p{ color:#c9b48a; }
+.hidden{ display:none !important; }
+
+@media (prefers-reduced-motion: reduce){
+  .card.playable, .card.targetable, #turn-info{ animation:none; }
+}
+
+/* ============================================================ 动画层（表现层，引擎不改） ============================================================ */
+/* 全屏特效层：飘字/横幅/飞行体，不吃点击 */
+#fx-layer{ position:fixed; inset:0; pointer-events:none; z-index:60; overflow:hidden; }
+/* 飘动数字（伤害红 / 治疗绿） */
+.fx-num{
+  position:fixed; transform:translate(-50%,0); font-weight:900; font-size:22px; letter-spacing:1px;
+  text-shadow:0 2px 4px #000, 0 0 8px currentColor; animation:fx-float-up .95s cubic-bezier(.2,.8,.3,1) forwards; z-index:61;
+}
+.fx-num.dmg{ color:#ff5a5a; } .fx-num.heal{ color:#63e59a; }
+@keyframes fx-float-up{
+  0%{ transform:translate(-50%,6px) scale(.5); opacity:0; }
+  18%{ transform:translate(-50%,-4px) scale(1.2); opacity:1; }
+  100%{ transform:translate(-50%,-46px) scale(1); opacity:0; }
+}
+/* 受伤：红闪 + 抖动 */
+.minion.hit, .hero.hit{ animation:fx-hitflash .32s ease-out, fx-shake .32s ease-out; }
+@keyframes fx-hitflash{ 0%,100%{ filter:brightness(1); } 40%{ filter:brightness(2.1) sepia(.7) saturate(6) hue-rotate(-25deg); } }
+@keyframes fx-shake{
+  0%,100%{ transform:translateX(0); } 20%{ transform:translateX(-5px); } 40%{ transform:translateX(5px); }
+  60%{ transform:translateX(-4px); } 80%{ transform:translateX(3px); }
+}
+/* 治疗：绿色柔光 */
+.minion.healing, .hero.healing{ animation:fx-healglow .5s ease-out; }
+@keyframes fx-healglow{ 0%,100%{ filter:brightness(1); } 45%{ filter:brightness(1.45) drop-shadow(0 0 10px #63e59a); } }
+/* 死亡：灰化碎裂旋转淡出（结束后 JS remove） */
+.minion.dying{ animation:fx-shatter .42s ease-in forwards; pointer-events:none; z-index:30; }
+@keyframes fx-shatter{
+  0%{ filter:grayscale(0) brightness(1); transform:scale(1) rotate(0); opacity:1; }
+  25%{ filter:grayscale(1) brightness(1.8); transform:scale(1.12) rotate(0); opacity:1; }
+  100%{ filter:grayscale(1) brightness(.35); transform:scale(.18) rotate(16deg); opacity:0; }
+}
+/* 打出随从落位弹跳 / 召唤弹出 */
+.minion.landing{ animation:fx-land .30s ease-out; }
+.minion.summoning{ animation:fx-summon .34s ease-out; }
+@keyframes fx-land{ 0%{ transform:scale(1.35); } 55%{ transform:scale(.9); } 100%{ transform:scale(1); } }
+@keyframes fx-summon{ 0%{ transform:scale(.2) rotate(-8deg); opacity:0; } 60%{ transform:scale(1.15); opacity:1; } 100%{ transform:scale(1); } }
+/* 飞行 ghost / 投射物（暖调） */
+.fx-ghost-card{
+  position:fixed; left:0; top:0; width:88px; height:122px; border-radius:10px;
+  background:linear-gradient(#5a3a1e,#2a1a0e); border:2px solid var(--gold); background-size:cover; background-position:center top;
+  box-shadow:0 8px 24px #000a; z-index:62; will-change:transform;
+}
+.fx-ghost-card.back{ background:repeating-linear-gradient(45deg,#3a2a18 0 6px,#251a0f 6px 12px); }
+.fx-bolt{
+  position:fixed; left:0; top:0; width:26px; height:26px; border-radius:50%; z-index:62;
+  background:radial-gradient(circle, #fff, #ffcf5a 40%, #ff7a2f 70%, transparent 72%);
+  box-shadow:0 0 16px #ffb14a; will-change:transform;
+}
+/* 回合横幅（暖调金框斜切扫入） */
+.fx-banner{
+  position:fixed; left:0; right:0; top:40%; margin:auto; width:fit-content;
+  padding:14px 60px; font-size:30px; font-weight:800; letter-spacing:4px; color:#ffe9c4;
+  background:linear-gradient(90deg, transparent, rgba(120,72,26,.94) 20%, rgba(120,72,26,.94) 80%, transparent);
+  border-top:2px solid var(--gold-hi); border-bottom:2px solid var(--gold-hi);
+  text-shadow:0 2px 8px #000, 0 0 12px var(--torch-glow); transform:skewX(-12deg); z-index:63;
+  animation:fx-banner 1.15s ease-in-out forwards;
+}
+@keyframes fx-banner{
+  0%{ transform:translateX(-120%) skewX(-12deg); opacity:0; }
+  18%{ transform:translateX(0) skewX(-12deg); opacity:1; }
+  78%{ transform:translateX(0) skewX(-12deg); opacity:1; }
+  100%{ transform:translateX(120%) skewX(-12deg); opacity:0; }
+}
+/* 法力水晶点亮闪光 */
+.mana-bar .dot.lit{ animation:fx-manapop .5s ease-out; }
+@keyframes fx-manapop{
+  0%{ transform:scale(.4); filter:brightness(3); text-shadow:0 0 12px #7fd0ff; }
+  60%{ transform:scale(1.6); filter:brightness(2.2); } 100%{ transform:scale(1); filter:brightness(1); text-shadow:none; }
+}
+/* 胜负结算大图 */
+.overlay h1.win{ animation:fx-overpop .6s cubic-bezier(.2,1.4,.4,1) both; }
+@keyframes fx-overpop{
+  0%{ transform:scale(.4) rotate(-6deg); opacity:0; filter:brightness(2); }
+  60%{ transform:scale(1.12) rotate(0); opacity:1; } 100%{ transform:scale(1); filter:brightness(1); }
+}
+@media (prefers-reduced-motion: reduce){
+  .fx-num, .minion.hit, .hero.hit, .minion.dying, .minion.landing, .minion.summoning,
+  .fx-banner, .mana-bar .dot.lit, .overlay h1.win{ animation-duration:.01ms !important; }
+}
+
+/* ============================================================ 三期：悬浮放大 + 静音 ============================================================ */
+/* 悬浮放大层：屏幕左侧空白区放大展示当前悬停的卡（纯展示，不吃点击） */
+#zoom-layer{
+  position:fixed; left:26px; top:50%; transform:translateY(-50%);
+  z-index:80; pointer-events:none; opacity:0; transition:opacity .12s ease;
+  filter:drop-shadow(0 12px 30px rgba(0,0,0,.8));
+}
+#zoom-layer.show{ opacity:1; }
+#zoom-layer .card{
+  transform:scale(2.4); transform-origin:left center; animation:none !important;
+  margin:120px 0 120px 90px;   /* 放大后留出四周空间避免溢出屏幕 */
+}
+/* 放大态强制显示随从说明（战场随从平时隐藏 .ctext） */
+#zoom-layer .card.minion .ctext{ display:block; }
+#zoom-layer .card.minion{ width:88px; height:122px; }
+#zoom-layer .card.minion:has(.catk)::before{ height:56px; }
+#zoom-layer .card.minion .cname{ top:57px; font-size:11px; }
+
+/* ---------- 三期：英雄技能按钮 ---------- */
+.hero-power{
+  position:relative; width:56px; height:56px; border-radius:50%; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center; text-align:center; cursor:default;
+  background:radial-gradient(circle at 40% 30%, #6a5bb0, #2a1d55 72%);
+  border:2px solid var(--arc); color:#e8dfff; font-size:9px; font-weight:700; line-height:1.15;
+  box-shadow:inset 0 1px 2px rgba(180,150,255,.4), inset 0 -3px 6px rgba(0,0,0,.5), 0 2px 6px rgba(0,0,0,.55);
+  text-shadow:0 1px 2px #000; transition:filter .15s ease, box-shadow .18s ease;
+}
+.hero-power .hp-name{ padding:0 3px; }
+.hero-power .hp-cost{
+  position:absolute; top:-7px; right:-7px; width:22px; height:22px; border-radius:50%; z-index:2;
+  display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:900; color:#fff;
+  background:radial-gradient(circle at 35% 30%, var(--mana-hi), var(--mana) 58%, var(--mana-lo));
+  box-shadow:0 1px 3px rgba(0,0,0,.6), inset 0 1px 2px rgba(255,255,255,.4); text-shadow:0 1px 2px #06284a;
+}
+.hero-power.usable{ cursor:pointer; box-shadow:inset 0 1px 2px rgba(180,150,255,.5), 0 0 14px rgba(120,90,230,.9); }
+.hero-power.usable:hover{ filter:brightness(1.15); }
+.hero-power.used, .hero-power.locked{ filter:grayscale(.7) brightness(.55); }
+
+/* ---------- 三期：起手换牌 ---------- */
+.mull-cards{ display:flex; gap:34px; padding:20px 10px; flex-wrap:wrap; justify-content:center; }
+.mull-cards .card{ cursor:pointer; transform:scale(1.32); margin:34px 8px; transition:transform .1s ease, filter .15s ease; }
+.mull-cards .card:hover{ transform:scale(1.42) translateY(-4px); }
+.mull-cards .card.disabled{ cursor:not-allowed; }
+.mull-cards .card.mull-marked{
+  filter:grayscale(.55) brightness(.55);
+  box-shadow:0 0 0 3px var(--target), 0 0 18px rgba(255,77,77,.7) !important;
+}
+.mull-cards .mull-tag{
+  position:absolute; top:44%; left:50%; transform:translate(-50%,-50%) rotate(-12deg); z-index:20;
+  background:rgba(200,40,40,.94); color:#fff; font-weight:900; font-size:12px; letter-spacing:2px;
+  padding:2px 8px; border-radius:4px; box-shadow:0 2px 6px #000; pointer-events:none;
+}
+
+/* 静音开关：右上角 */
+#btn-mute{
+  position:fixed; top:12px; right:258px; z-index:90; width:40px; height:40px; padding:0;
+  font-size:18px; line-height:1; border-radius:50%; border:2px solid var(--gold-lo);
+  background:linear-gradient(180deg,#5a3a1e,#2a1a0e); box-shadow:0 2px 6px rgba(0,0,0,.5);
+}
+</style>
+<style>
+/* ============================================================ 联机版新增 ============================================================ */
+#turn-timer.urgent{ color:#ff6b6b; }
+#conn-badge{ position:fixed; top:10px; right:258px; z-index:90; font-size:12px; padding:4px 10px; border-radius:12px;
+             background:rgba(0,0,0,.6); color:#c9b48a; border:1px solid var(--gold-lo); }
+#conn-badge.ok{ color:#7fe0a0; } #conn-badge.bad{ color:#ff8f7d; }
+#opp-banner{ position:fixed; top:54px; left:50%; transform:translateX(-50%); z-index:90; padding:6px 16px; border-radius:8px;
+             background:rgba(120,30,30,.9); color:#ffd6d6; font-size:13px; border:1px solid #a33; box-shadow:0 2px 8px #000a; }
+#toast{ position:fixed; bottom:70px; left:50%; transform:translateX(-50%); z-index:95; padding:8px 18px; border-radius:8px;
+        background:rgba(40,25,12,.95); color:#ffe9c4; font-size:14px; border:1px solid var(--gold-lo); box-shadow:0 4px 12px #000a; }
+.overlay input{ font-size:16px; padding:8px 12px; border-radius:8px; border:2px solid var(--gold-lo); background:#1a120a;
+                color:#ffe9c4; font-family:inherit; width:200px; text-align:center; }
+.overlay input:focus{ outline:none; border-color:var(--gold); }
+.lobby-row{ display:flex; gap:10px; align-items:center; }
+.room-code{ font-size:56px; font-weight:900; letter-spacing:12px; color:#ffd75a; text-shadow:0 0 20px var(--torch-glow); }
+button.secondary{ font-size:13px; padding:6px 14px; opacity:.85; }
+.hero .hname .dc{ color:#ff8f7d; font-size:10px; margin-left:3px; }
+.overlay .sub{ color:#c9b48a; font-size:13px; max-width:560px; text-align:center; line-height:1.7; }
+.overlay a{ color:#ffd6a3; }
+.overlay .sub code{ color:#ffe9c4; background:rgba(0,0,0,.4); padding:1px 5px; border-radius:4px; }
+#log .me{ color:#d9c7a4; }
+</style>
+</head>
+<body>
+
+<div id="game">
+  <div class="side-bar">
+    <div class="hero" id="hero-opp"></div>
+    <div class="hero-power" id="hp-opp"></div>
+    <div class="stat-col"><div class="mana-bar" id="mana-opp"></div><div class="deck-info" id="deck-opp"></div></div>
+    <div class="hand-row" id="hand-opp"></div>
+  </div>
+  <div id="arena">
+    <div class="board-row" id="board-opp"></div>
+    <div id="turn-info"><span id="turn-text">连接服务器…</span><span id="turn-timer"></span></div>
+    <div class="board-row" id="board-me"></div>
+  </div>
+  <div class="side-bar">
+    <div class="hero" id="hero-me"></div>
+    <div class="hero-power" id="hp-me"></div>
+    <div class="stat-col"><div class="mana-bar" id="mana-me"></div><div class="deck-info" id="deck-me"></div></div>
+    <div class="hand-row" id="hand-me"></div>
+  </div>
+  <div id="bottom-bar"><button id="btn-end" disabled>回合结束</button><button id="btn-leave" class="secondary">退出对局</button></div>
+</div>
+<div id="log"></div>
+<div id="fx-layer"></div>
+<div id="conn-badge">连接中…</div>
+<div id="opp-banner" class="hidden"></div>
+<div id="toast" class="hidden"></div>
+
+<div class="overlay hidden" id="ov-lobby">
+  <h1>炉石简化版 · 联机对战</h1>
+  <p class="sub" id="lobby-rule">服务器权威裁决 · 洗牌抽牌在服务端 · 断线 60 秒内可重连</p>
+  <div class="lobby-row"><span>昵称</span><input id="nick" maxlength="12" placeholder="可不填"></div>
+  <div class="lobby-row"><button id="btn-create">创建房间</button><button id="btn-quick">快速匹配</button></div>
+  <div class="lobby-row"><input id="code-input" maxlength="4" inputmode="numeric" placeholder="4 位房间码"><button id="btn-join">加入房间</button></div>
+  <p class="sub" id="lobby-msg"></p>
+  <p class="sub"><a href="index.html">← 单机版（人机 / 双人同屏）</a></p>
+</div>
+<div class="overlay hidden" id="ov-wait">
+  <h1>等待对手加入</h1>
+  <p>房间码</p>
+  <div class="room-code" id="room-code">----</div>
+  <p class="sub">把房间码或邀请链接发给对手，对方打开即可加入</p>
+  <div class="lobby-row"><input id="invite-link" readonly style="width:360px"><button id="btn-copy" class="secondary">复制链接</button></div>
+  <button id="btn-cancel" class="secondary">取消</button>
+</div>
+<div class="overlay hidden" id="ov-mulligan">
+  <h1 id="mull-title">起手换牌</h1>
+  <p>点击要替换的卡（可不换），确认后洗回牌库并重抽等量新牌</p>
+  <div class="mull-cards" id="mull-cards"></div>
+  <button id="btn-mull-confirm">确认换牌</button>
+</div>
+<div class="overlay hidden" id="ov-over">
+  <h1 id="over-title"></h1>
+  <p class="sub" id="over-sub"></p>
+  <div class="lobby-row"><button id="btn-again">再来一局</button><a id="btn-replay" href="#" target="_blank"><button class="secondary">查看回放校验</button></a></div>
+</div>
+
+<script type="module">
+// ===================== 联机客户端：只发"操作意图"，一切合法性由服务端裁决，本地只做渲染与高亮提示 =====================
+import { HERO_POWER, db, other, cardPlayable, needsTarget } from './shared/engine.js';
+
+const $ = id => document.getElementById(id);
+const load = k => localStorage.getItem(k);   // 读本地存储（重连凭证 / 昵称）
+const RARITY = { BOMBER: 'rare', GUNNER: 'rare', FIREBALL: 'epic', HARVESTER: 'epic', SENJIN: 'rare' };
+const HERO_ART = { p1: 'HERO_MAGE', p2: 'HERO_PALADIN' };
+const HAS_ART = new Set(['MURLOC', 'MURLOC_SCOUT', 'BOLT', 'WOLFRIDER', 'GUNNER', 'BOMBER',
+                         'GRIZZLY', 'HARVESTER', 'PART', 'FIREBALL', 'YETI', 'SENJIN']);
+const artSrc = id => 'assets/art/' + id + '.png';
+const artStyle = cardId => (HAS_ART.has(cardId) ? `--art:url('${artSrc(cardId)}')` : '');
+const rarityClass = cardId => 'rarity-' + (RARITY[cardId] || 'common');
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+const ERR_TEXT = {
+  NOT_YOUR_TURN: '还没轮到你', NO_MANA: '法力不够', NOT_IN_HAND: '这张牌不在你手里', NEED_TARGET: '需要选择目标',
+  BAD_TARGET: '目标不合法', BOARD_FULL: '场上随从已满（最多 5 个）', NOT_READY: '这个随从本回合不能攻击', NO_MINION: '随从不存在',
+  TAUNT: '对方有嘲讽随从，必须先攻击嘲讽', HERO_POWER_USED: '英雄技能本回合已用过', WRONG_PHASE: '当前阶段不能这么做',
+  GAME_OVER: '对局已结束', MULLIGAN_DONE: '已经换过牌了', ROOM_NOT_FOUND: '房间不存在或已关闭', ROOM_FULL: '房间已满',
+  ROOM_GONE: '上次的对局已结束', NOT_IN_ROOM: '尚未进入房间', ALREADY_IN_ROOM: '已经在房间里', RATE_LIMITED: '操作太快了',
+  BAD_INTENT: '无效操作', NOT_STARTED: '对手还没进来', BAD_JSON: '消息格式错误', BAD_MESSAGE: '未知消息',
+};
+
+// 服务器地址：默认同源 /ws；可用 ?server=ws://host:port/ws 覆盖（GitHub Pages 等纯静态托管时）
+const params = new URLSearchParams(location.search);
+const WS_URL = params.get('server') || ((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
+const STATIC_HOST = location.protocol === 'file:' || location.hostname.endsWith('github.io');
+
+const S = {
+  ws: null, connected: false, reconnectDelay: 500, replaced: false,
+  view: null, seq: null, seat: null, roomId: null, code: null,
+  token: load('hs_token'), pendingJoin: params.get('code'),
+  sel: null,                 // {kind:'card',uid} | {kind:'minion',uid} | {kind:'power'}
+  offset: 0,                 // 服务器时间 - 本地时间，倒计时用
+  oppStatus: null, graceUntil: null, turnSeconds: null, reqSeq: 0,
+};
+const mullMarks = new Set();
+
+// ---------------- 连接 ----------------
+function connect() {
+  if (STATIC_HOST && !params.get('server')) {
+    showLobby('这里是纯静态托管，没有对战服务端。请打开部署了服务端的地址，或在网址后加 ?server=ws://主机:端口/ws');
+    for (const id of ['btn-create', 'btn-quick', 'btn-join']) { $(id).disabled = true; }
+    setBadge('无服务端', 'bad');
+    return;
+  }
+  setBadge('连接中…', '');
+  const ws = new WebSocket(WS_URL);
+  S.ws = ws;
+  ws.onopen = () => {
+    S.connected = true; S.reconnectDelay = 500;
+    setBadge('已连接', 'ok');
+    if (S.token) { send({ t: 'resume', token: S.token }); }           // 有 token 先尝试恢复对局
+    else if (S.pendingJoin) { send({ t: 'join', code: S.pendingJoin, name: nick() }); }
+    else { showLobby(); }
+  };
+  ws.onmessage = e => { let m; try { m = JSON.parse(e.data); } catch { return; } handle(m); };
+  ws.onclose = ev => {
+    S.connected = false;
+    if (ev.code === 4001) {   // 同一对局在别的窗口打开了，这个窗口让位
+      S.replaced = true;
+      setBadge('已在其他窗口打开', 'bad');
+      showLobby('这局对战已在另一个窗口 / 标签页中打开。关闭那个窗口后刷新本页即可回来。');
+      return;
+    }
+    setBadge('连接断开，重连中…', 'bad');
+    setTimeout(connect, S.reconnectDelay);
+    S.reconnectDelay = Math.min(S.reconnectDelay * 2, 5000);
+  };
+  ws.onerror = () => { /* 交给 onclose */ };
+}
+function send(m) {
+  if (S.ws && S.ws.readyState === 1) { S.ws.send(JSON.stringify(m)); }
+  else { toast('连接未就绪，请稍候'); }
+}
+function intent(i) { send({ t: 'intent', reqId: 'r' + (++S.reqSeq), ...i }); }
+function setBadge(text, cls) { const el = $('conn-badge'); el.textContent = text; el.className = cls; }
+
+function handle(m) {
+  switch (m.t) {
+    case 'hello':
+      S.offset = m.now - Date.now(); S.turnSeconds = m.turnSeconds;
+      $('lobby-rule').textContent = `服务器权威裁决 · 洗牌抽牌在服务端 · 每回合 ${m.turnSeconds} 秒 · 断线 60 秒内可重连`;
+      return;
+    case 'pong': S.offset = m.now - Date.now(); return;
+    case 'joined':
+      S.token = m.token; localStorage.setItem('hs_token', m.token);
+      S.seat = m.seat; S.code = m.code; S.roomId = m.roomId; S.pendingJoin = null;
+      if (m.waiting) { showWait(); } else { hideOverlays(); }
+      return;
+    case 'snapshot':
+      S.seq = m.seq; applyView(m.view);
+      hideOverlays(['ov-lobby', 'ov-wait']);
+      render();
+      return;
+    case 'update':
+      if (S.seq !== null && m.seq !== S.seq + 1) { send({ t: 'sync' }); return; }   // 序号不连续：丢包/乱序 → 要完整快照
+      S.seq = m.seq; applyView(m.view);
+      render();
+      playEvents(m.events);
+      return;
+    case 'error':
+      if (m.code === 'ROOM_GONE') {
+        clearRoom();
+        if (S.pendingJoin) { send({ t: 'join', code: S.pendingJoin, name: nick() }); } else { showLobby('上次的对局已结束，可以开新的一局'); }
+        return;
+      }
+      if (m.code === 'ROOM_NOT_FOUND' || m.code === 'ROOM_FULL') { S.pendingJoin = null; showLobby(ERR_TEXT[m.code]); return; }
+      toast(ERR_TEXT[m.code] || m.code);
+      return;
+    case 'opponent':
+      S.oppStatus = m.status; S.graceUntil = m.graceUntil || null;
+      if (m.now) { S.offset = m.now - Date.now(); }
+      renderOppBanner();
+      if (m.status === 'reconnected') { toast('对手已重连'); }
+      return;
+    case 'room_closed':
+      clearRoom();
+      showLobby(m.reason === 'left' ? '已离开房间' : m.reason === 'shutdown' ? '服务器重启了，请重新开局' : '房间已关闭');
+      return;
+    default: return;
+  }
+}
+function applyView(v) {
+  S.view = v; S.seat = v.seat; S.roomId = v.roomId; S.code = v.code;
+  if (v.now) { S.offset = v.now - Date.now(); }
+  if (v.players) {
+    const opp = v.players[other(v.seat)];
+    if (opp && opp.connected && S.oppStatus === 'disconnected') { S.oppStatus = null; renderOppBanner(); }
+  }
+}
+function clearRoom() {
+  S.token = null; localStorage.removeItem('hs_token');
+  S.view = null; S.seq = null; S.sel = null; S.roomId = null; S.code = null; S.oppStatus = null; S.graceUntil = null;
+  mullMarks.clear();
+  for (const id of ['board-me', 'board-opp', 'hand-me', 'hand-opp']) { $(id).innerHTML = ''; }
+  $('turn-text').textContent = ''; $('turn-timer').textContent = '';
+  $('btn-end').disabled = true;
+  renderOppBanner();
+}
+
+// ---------------- 大厅 / 等待 ----------------
+const nick = () => ($('nick').value || '').trim();
+const saveNick = () => localStorage.setItem('hs_nick', nick());
+function hideOverlays(ids = ['ov-lobby', 'ov-wait', 'ov-mulligan', 'ov-over']) { for (const id of ids) { $(id).classList.add('hidden'); } }
+function showLobby(msg) {
+  hideOverlays();
+  $('ov-lobby').classList.remove('hidden');
+  $('lobby-msg').textContent = msg || '';
+  if (!$('nick').value) { $('nick').value = localStorage.getItem('hs_nick') || ''; }
+  if (S.pendingJoin) { $('code-input').value = S.pendingJoin; }
+  $('turn-text').textContent = '未进入对局';
+}
+function showWait() {
+  hideOverlays();
+  $('ov-wait').classList.remove('hidden');
+  $('room-code').textContent = S.code;
+  $('invite-link').value = `${location.origin}${location.pathname}?code=${S.code}`;
+  $('turn-text').textContent = `房间 ${S.code} · 等待对手…`;
+}
+$('btn-create').onclick = () => { saveNick(); send({ t: 'create', name: nick() }); };
+$('btn-quick').onclick = () => { saveNick(); send({ t: 'quick', name: nick() }); };
+$('btn-join').onclick = () => {
+  const code = $('code-input').value.trim();
+  if (!/^\d{4}$/.test(code)) { toast('房间码是 4 位数字'); return; }
+  saveNick(); send({ t: 'join', code, name: nick() });
+};
+$('code-input').onkeydown = e => { if (e.key === 'Enter') { $('btn-join').click(); } };
+$('btn-copy').onclick = async () => {
+  try { await navigator.clipboard.writeText($('invite-link').value); toast('已复制邀请链接'); }
+  catch { $('invite-link').select(); toast('请手动复制'); }
+};
+$('btn-cancel').onclick = () => { send({ t: 'leave' }); clearRoom(); showLobby(); };
+$('btn-leave').onclick = () => {
+  if (!S.view) { return; }
+  if (!S.view.over && !confirm('退出会判你本局认输，确定？')) { return; }
+  send({ t: 'leave' }); clearRoom(); showLobby();
+};
+$('btn-again').onclick = () => { send({ t: 'leave' }); clearRoom(); showLobby(); };
+
+// ---------------- 渲染（纯读 view） ----------------
+const seatOf = who => (who === 'me' ? S.view.seat : other(S.view.seat));
+const myTurn = () => { const v = S.view; return !!v && v.phase === 'play' && v.active === v.seat && !v.over; };
+
+function render() {
+  const v = S.view;
+  if (!v) { return; }
+  $('arena').style.setProperty('--board', `url('${artSrc('board')}')`);
+  renderHero('me', v.me); renderHero('opp', v.opp);
+  renderHeroPower('me'); renderHeroPower('opp');
+  renderBoard('me', v.me.board); renderBoard('opp', v.opp.board);
+  renderHand(); renderOppHand(v.opp.handCount);
+  $('btn-end').disabled = !myTurn();
+  renderTurnInfo(); renderLog();
+  // 阶段 → 遮罩
+  if (v.phase === 'mulligan' && !v.mulliganDone[v.seat]) { showMulligan(); } else { $('ov-mulligan').classList.add('hidden'); }
+  if (v.over) { showOver(); } else { $('ov-over').classList.add('hidden'); }
+}
+
+function renderHero(who, side) {
+  const el = $('hero-' + who);
+  const seat = seatOf(who);
+  el.className = 'hero';
+  el.style.setProperty('--art', `url('${artSrc(HERO_ART[seat])}')`);
+  const p = S.view.players && S.view.players[seat];
+  const dc = p && !p.connected ? '<span class="dc">离线</span>' : '';
+  el.innerHTML = `<div class="hname">${esc(side.name)}${dc}</div><div class="hhp">${side.heroHp}</div>`;
+  el.onclick = e => { e.stopPropagation(); onTargetClick({ type: 'hero', side: seat }); };
+  markTargetable(el, { type: 'hero', side: seat });
+  const dots = Array.from({ length: side.manaMax }, (_, i) => `<span class="dot${i < side.mana ? '' : ' empty'}">◆</span>`).join('');
+  $('mana-' + who).innerHTML = `${side.mana}/${side.manaMax} ${dots}`;
+  $('deck-' + who).textContent = who === 'me' ? `牌库 ${side.deckCount}` : `牌库 ${side.deckCount} · 手牌 ${side.handCount}`;
+}
+function renderHeroPower(who) {
+  const el = $('hp-' + who);
+  const seat = seatOf(who);
+  const hp = HERO_POWER[seat];
+  const side = who === 'me' ? S.view.me : S.view.opp;
+  const usable = who === 'me' && myTurn() && !S.sel && !side.heroPowerUsed && side.mana >= hp.cost;
+  el.className = 'hero-power' + (usable ? ' usable' : '') + (side.heroPowerUsed ? ' used' : '');
+  el.innerHTML = `<div class="hp-cost">${hp.cost}</div><div class="hp-name">${hp.name}</div>`;
+  el.title = hp.text;
+  el.onclick = e => { e.stopPropagation(); if (who === 'me') { onHeroPowerClick(); } };
+}
+function renderBoard(who, board) {
+  const box = $('board-' + who);
+  box.innerHTML = '';
+  for (const m of board) {
+    const def = db(m);
+    const el = document.createElement('div');
+    el.className = 'card minion ' + rarityClass(m.cardId) + (m.taunt ? ' taunt' : '');
+    el.dataset.uid = m.uid;
+    const style = artStyle(m.cardId);
+    if (style) { el.setAttribute('style', style); }
+    el.innerHTML = `<div class="cname">${def.name}</div><div class="catk">${m.atk}</div>` +
+      `<div class="chp" data-damaged="${m.hp < m.hpMax ? 1 : 0}">${m.hp}</div>` + (m.taunt ? '<div class="taunt-shield"></div>' : '');
+    if (who === 'me' && myTurn() && !S.sel) { el.classList.add(m.ready ? 'can-attack' : 'summoning-sick'); }
+    if (S.sel && S.sel.kind === 'minion' && S.sel.uid === m.uid) { el.classList.add('selected'); }
+    markTargetable(el, { type: 'minion', uid: m.uid, who });
+    el.onclick = e => { e.stopPropagation(); onMinionClick(who, m.uid); };
+    box.appendChild(el);
+  }
+}
+function renderHand() {
+  const v = S.view;
+  const box = $('hand-me');
+  box.innerHTML = '';
+  for (const c of v.me.hand) {
+    const def = db(c);
+    const el = document.createElement('div');
+    el.className = 'card ' + rarityClass(c.cardId);
+    el.dataset.uid = c.uid;
+    const style = artStyle(c.cardId);
+    if (style) { el.setAttribute('style', style); }
+    const stats = def.type === 'minion' ? `<div class="catk">${def.atk}</div><div class="chp">${def.hp}</div>` : '';
+    el.innerHTML = `<div class="cost">${def.cost}</div><div class="cname">${def.name}</div><div class="ctext">${def.text}</div>${stats}`;
+    if (myTurn() && cardPlayable(def, { mana: v.me.mana, boardCount: v.me.board.length })) { el.classList.add('playable'); }
+    if (S.sel && S.sel.kind === 'card' && S.sel.uid === c.uid) { el.classList.add('selected'); }
+    el.onclick = e => { e.stopPropagation(); onHandClick(c.uid); };
+    box.appendChild(el);
+  }
+}
+function renderOppHand(n) {
+  const box = $('hand-opp');
+  box.innerHTML = '';
+  for (let i = 0; i < n; i++) { const b = document.createElement('div'); b.className = 'cardback'; box.appendChild(b); }
+}
+// 目标高亮只是提示：法术 / 技能可指任何目标；攻击受嘲讽约束。最终合法性由服务端裁决
+function markTargetable(el, target) {
+  if (!S.sel || !myTurn()) { return; }
+  if (S.sel.kind === 'card' || S.sel.kind === 'power') { el.classList.add('targetable'); return; }
+  const v = S.view;
+  const taunts = v.opp.board.filter(m => m.taunt);
+  if (target.type === 'hero' && target.side !== v.seat && taunts.length === 0) { el.classList.add('targetable'); }
+  if (target.type === 'minion' && target.who === 'opp') {
+    const m = v.opp.board.find(x => x.uid === target.uid);
+    if (m && (taunts.length === 0 || m.taunt)) { el.classList.add('targetable'); }
+  }
+}
+function renderTurnInfo() {
+  const v = S.view;
+  let text;
+  if (v.over) { text = '对局结束'; }
+  else if (v.phase === 'mulligan') { text = v.mulliganDone[v.seat] ? '起手换牌 · 等待对手换牌…' : '起手换牌'; }
+  else { text = `回合 ${Math.ceil(v.turn / 2)} · ${myTurn() ? '你的回合' : `${esc(v.opp.name)} 的回合`}`; }
+  $('turn-text').textContent = text;
+  tickTimer();
+}
+function renderLog() {
+  const box = $('log');
+  box.innerHTML = S.view.log.map(e => `<div class="${e.cls}">${esc(e.msg)}</div>`).join('');
+  box.scrollTop = box.scrollHeight;
+}
+function renderOppBanner() {
+  const el = $('opp-banner');
+  if (S.oppStatus === 'disconnected' && S.view && !S.view.over) { el.classList.remove('hidden'); tickTimer(); }
+  else { el.classList.add('hidden'); }
+}
+// 倒计时：服务端下发 deadline 时间戳，客户端只负责显示；超时由服务端自动结束回合
+function tickTimer() {
+  const v = S.view;
+  const el = $('turn-timer');
+  if (!v || !v.turnDeadline || v.over) { el.textContent = ''; el.classList.remove('urgent'); }
+  else {
+    const remain = Math.max(0, Math.ceil((v.turnDeadline - (Date.now() + S.offset)) / 1000));
+    el.textContent = ` · 剩余 ${remain}s`;
+    el.classList.toggle('urgent', remain <= 10);
+    if (v.phase === 'mulligan' && !v.mulliganDone[v.seat]) { $('mull-title').textContent = `起手换牌 · 剩余 ${remain}s`; }
+  }
+  if (S.oppStatus === 'disconnected' && S.graceUntil) {
+    const g = Math.max(0, Math.ceil((S.graceUntil - (Date.now() + S.offset)) / 1000));
+    $('opp-banner').textContent = `对手掉线，等待重连… ${g}s 内未回来将判对手负`;
+  }
+}
+setInterval(tickTimer, 250);
+setInterval(() => { if (S.connected) { send({ t: 'ping' }); } }, 25000);   // 校时 + 保活
+
+// ---------------- 交互 → 意图 ----------------
+function onHandClick(uid) {
+  if (!myTurn()) { return; }
+  const v = S.view;
+  const card = v.me.hand.find(c => c.uid === uid);
+  if (!card) { return; }
+  const def = db(card);
+  if (!cardPlayable(def, { mana: v.me.mana, boardCount: v.me.board.length })) {
+    S.sel = null; render(); toast(v.me.mana < def.cost ? '法力不够' : '场上随从已满'); return;
+  }
+  if (needsTarget(def)) { S.sel = { kind: 'card', uid }; render(); return; }
+  S.sel = null;
+  intent({ op: 'play', uid });
+}
+function onMinionClick(who, uid) {
+  if (!myTurn()) { return; }
+  if (S.sel) { onTargetClick({ type: 'minion', uid }); return; }
+  if (who !== 'me') { return; }
+  const m = S.view.me.board.find(x => x.uid === uid);
+  if (!m) { return; }
+  if (m.ready) { S.sel = { kind: 'minion', uid }; render(); } else { toast('这个随从本回合不能攻击'); }
+}
+function onTargetClick(target) {
+  if (!S.sel || !myTurn()) { return; }
+  const sel = S.sel;
+  S.sel = null;
+  if (sel.kind === 'card') { intent({ op: 'play', uid: sel.uid, target }); }
+  if (sel.kind === 'minion') { intent({ op: 'attack', uid: sel.uid, target }); }
+  if (sel.kind === 'power') { intent({ op: 'hero_power', target }); }
+  render();
+}
+function onHeroPowerClick() {
+  if (!myTurn()) { return; }
+  const v = S.view;
+  const hp = HERO_POWER[v.seat];
+  if (v.me.heroPowerUsed) { toast('英雄技能本回合已用过'); return; }
+  if (v.me.mana < hp.cost) { toast('法力不够'); return; }
+  if (hp.needTarget) { S.sel = { kind: 'power' }; render(); return; }
+  S.sel = null;
+  intent({ op: 'hero_power' });
+}
+$('btn-end').onclick = () => { if (!myTurn()) { return; } S.sel = null; intent({ op: 'end_turn' }); };
+document.body.addEventListener('click', () => { if (S.sel) { S.sel = null; render(); } });
+
+// ---------------- 起手换牌 ----------------
+function buildCardFace(c) {
+  const def = db(c);
+  const el = document.createElement('div');
+  el.className = 'card ' + rarityClass(c.cardId);
+  const style = artStyle(c.cardId);
+  if (style) { el.setAttribute('style', style); }
+  const stats = def.type === 'minion' ? `<div class="catk">${def.atk}</div><div class="chp">${def.hp}</div>` : '';
+  el.innerHTML = `<div class="cost">${def.cost}</div><div class="cname">${def.name}</div><div class="ctext">${def.text}</div>${stats}`;
+  return el;
+}
+function showMulligan() {
+  const ov = $('ov-mulligan');
+  const box = $('mull-cards');
+  box.innerHTML = '';
+  for (const c of S.view.me.hand) {
+    const el = buildCardFace(c);
+    if (c.cardId === 'COIN') { el.classList.add('disabled'); }
+    else {
+      if (mullMarks.has(c.uid)) { el.classList.add('mull-marked'); el.insertAdjacentHTML('beforeend', '<div class="mull-tag">替换</div>'); }
+      el.onclick = e => { e.stopPropagation(); if (mullMarks.has(c.uid)) { mullMarks.delete(c.uid); } else { mullMarks.add(c.uid); } showMulligan(); };
+    }
+    box.appendChild(el);
+  }
+  ov.classList.remove('hidden');
+}
+$('btn-mull-confirm').onclick = e => { e.stopPropagation(); intent({ op: 'mulligan', uids: [...mullMarks] }); mullMarks.clear(); };
+
+// ---------------- 结算 ----------------
+function showOver() {
+  const v = S.view;
+  const win = v.over === v.seat;
+  const draw = v.over === 'draw';
+  const title = $('over-title');
+  title.textContent = draw ? '平局！' : (win ? '你赢了！' : '你输了');
+  title.classList.toggle('win', win);
+  const reason = v.result && v.result.reason;
+  $('over-sub').textContent = reason === 'abandon' ? (win ? '对手掉线超时，判你获胜' : '你掉线超时，判负')
+                            : reason === 'forfeit' ? (win ? '对手退出了对局' : '你退出了对局')
+                            : `共 ${Math.ceil(v.turn / 2)} 个回合 · 英雄血量 ${v.me.heroHp} : ${v.opp.heroHp}`;
+  $('btn-replay').href = `/api/replay/${S.roomId}`;
+  $('ov-over').classList.remove('hidden');
+}
+
+// ---------------- 简化演出：服务端 events → 飘字 / 受击闪烁 / 回合横幅 ----------------
+function targetNode(t) {
+  if (!t) { return null; }
+  if (t.type === 'hero') { return $('hero-' + (t.side === S.view.seat ? 'me' : 'opp')); }
+  return document.querySelector(`.minion[data-uid="${t.uid}"]`);
+}
+function spawnNumber(anchor, text, cls) {
+  const r = anchor.getBoundingClientRect();
+  const el = document.createElement('div');
+  el.className = 'fx-num ' + cls;
+  el.textContent = text;
+  el.style.left = (r.left + r.width / 2) + 'px';
+  el.style.top = (r.top + r.height * 0.3) + 'px';
+  $('fx-layer').appendChild(el);
+  setTimeout(() => el.remove(), 1000);
+}
+function banner(text) {
+  const el = document.createElement('div');
+  el.className = 'fx-banner';
+  el.textContent = text;
+  $('fx-layer').appendChild(el);
+  setTimeout(() => el.remove(), 1200);
+}
+function playEvents(events) {
+  let delayMs = 0;
+  for (const e of events || []) {
+    if (e.type === 'damage') {
+      const node = targetNode(e.target);
+      if (node) {
+        setTimeout(() => { node.classList.add('hit'); spawnNumber(node, '-' + e.amount, 'dmg'); setTimeout(() => node.classList.remove('hit'), 400); }, delayMs);
+        delayMs += 120;
+      }
+    }
+    if (e.type === 'turn_start') { banner(e.side === S.view.seat ? '你的回合' : '对手的回合'); }
+    if (e.type === 'fatigue' && e.side === S.view.seat) { toast(`牌库已空，疲劳 ${e.amount} 点伤害`); }
+    if (e.type === 'burn' && e.side === S.view.seat) { toast('手牌已满，抽到的牌被烧掉了'); }
+  }
+}
+
+let toastTimer = null;
+function toast(text) {
+  const el = $('toast');
+  el.textContent = text;
+  el.classList.remove('hidden');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.add('hidden'), 1800);
+}
+
+connect();
+</script>
+</body>
+</html>
