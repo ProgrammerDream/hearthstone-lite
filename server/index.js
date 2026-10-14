@@ -73,6 +73,15 @@ export function createApp(opts = {}) {
   }
 
   function handleHttp(req, res) {
+    // 畸形请求目标（/%ZZ、/%C0%AE%C0%AE/、GET http://[::1 …）会让 new URL / decodeURIComponent 同步抛错；
+    // 在请求边界兜住返回 400，不能让一个请求打崩进程、丢光内存里的对局
+    try { route(req, res); } catch (e) {
+      log(`[http] 400 bad request url=${JSON.stringify(String(req.url).slice(0, 120))} err=${e.message}`);
+      if (res.headersSent) { res.destroy(); } else { json(res, 400, { error: 'bad request' }); }
+    }
+  }
+
+  function route(req, res) {
     const url = new URL(req.url, 'http://localhost');
     const p = url.pathname;
     if (req.method !== 'GET' && req.method !== 'HEAD') { return json(res, 405, { error: 'method not allowed' }); }
@@ -168,7 +177,8 @@ export function createApp(opts = {}) {
           if (!room) { return sendTo(sock, { t: 'error', code: 'NOT_IN_ROOM', reqId: msg.reqId }); }
           return room.sendSnapshot(conn.seat);
         case 'leave':
-          if (room) { room.leave(conn.seat); }
+          // 离开后立即让出这条 socket（同断线 detach）：同一连接接着建/加新房时，旧房不得再向它发 update / room_closed
+          if (room) { room.leave(conn.seat); room.detach(conn.seat, sock); }
           conn.room = null; conn.seat = null;
           return;
         default:

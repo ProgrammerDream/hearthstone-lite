@@ -6,6 +6,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { createApp } from '../index.js';
 import { Client, pair, act, waitTurn, playGame, wsUrlOf } from './helpers.js';
+import net from 'node:net';
+import WebSocket from 'ws';
 
 async function startApp(opts = {}) {
   const app = createApp({ host: '127.0.0.1', port: 0, quiet: true,
@@ -20,6 +22,105 @@ async function mulliganBoth(a, b) {
   b.send({ t: 'intent', op: 'mulligan', uids: [] });
   await Promise.all([a, b].map(c => c.waitFor(m => m.t === 'update' && m.view.phase === 'play', 4000, 'phase play')));
 }
+
+// 原始 HTTP：发送 fetch 构造不出来的畸形请求行
+function rawHttp(port, target) {
+  return new Promise((resolve, reject) => {
+    let buf = '';
+    const s = net.connect(port, '127.0.0.1', () => s.write(`GET ${target} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n`));
+    s.setTimeout(3000, () => s.destroy(new Error(`raw http timeout: ${target}`)));
+    s.on('data', d => { buf += d; });
+    s.on('error', e => (buf ? resolve(buf) : reject(e)));
+    s.on('close', () => resolve(buf));
+  });
+}
+// 原始 ws 客户端：保留全部收到的消息，按 roomId 精确匹配，避免把旧房消息误当新房
+function rawWs(url) {
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(url);
+    const msgs = [];
+    ws.on('message', d => msgs.push(JSON.parse(d.toString())));
+    ws.once('error', reject);
+    ws.once('open', () => resolve({
+      ws, msgs,
+      send: m => ws.send(JSON.stringify(m)),
+      waitFor: (pred, ms = 4000) => new Promise((ok, no) => {
+        const t0 = Date.now();
+        const tick = () => {
+          const m = msgs.find(pred);
+          if (m) { return ok(m); }
+          if (Date.now() - t0 > ms) { return no(new Error(`rawWs timeout; got ${msgs.map(x => x.t).join(',')}`)); }
+          setTimeout(tick, 20);
+        };
+        tick();
+      }),
+    }));
+  });
+}
+
+test('D1 回归：畸形 URL 返回 400，进程存活、健康检查正常、已有房间仍在', async () => {
+  const app = await startApp();
+  try {
+    const url = wsUrlOf(app);
+    const a = await rawWs(url), b = await rawWs(url);
+    a.send({ t: 'create', name: 'A' });
+    const ja = await a.waitFor(m => m.t === 'joined');
+    b.send({ t: 'join', code: ja.code, name: 'B' });
+    await b.waitFor(m => m.t === 'snapshot' && m.view.roomId === ja.roomId);
+    for (const target of ['/%ZZ', '/%C0%AE%C0%AE/', 'http://[::1']) {
+      const resp = await rawHttp(app.port, target);
+      assert.match(resp, /^HTTP\/1\.1 400 /, `${target} -> ${JSON.stringify(resp.slice(0, 60))}`);
+    }
+    const h = await getJson(app, '/healthz');
+    assert.equal(h.status, 200); assert.equal(h.body.ok, true); assert.equal(h.body.rooms, 1);
+    assert.ok(app.mm.rooms.has(ja.roomId), '既有房间仍在');
+    a.msgs.length = 0;
+    a.send({ t: 'sync' });
+    const s = await a.waitFor(m => m.t === 'snapshot');
+    assert.equal(s.view.roomId, ja.roomId);
+  } finally { await app.close(); }
+});
+
+test('D2 回归：同一 socket 离开后再来一局；旧房到期只通知仍在旧房的人，新房可行动、可重连', async () => {
+  const app = await startApp({ retentionMs: 300 });   // 缩短旧房保留期，不必真等 120 秒
+  try {
+    const url = wsUrlOf(app);
+    const a = await rawWs(url), b = await rawWs(url);
+    a.send({ t: 'create', name: 'A' });
+    const old = await a.waitFor(m => m.t === 'joined');
+    b.send({ t: 'join', code: old.code, name: 'B' });
+    await a.waitFor(m => m.t === 'snapshot' && m.view.roomId === old.roomId);
+    // A 对局中离开（认输），随即用同一条 socket 建新房
+    a.send({ t: 'leave' });
+    await b.waitFor(m => m.t === 'update' && m.view.roomId === old.roomId && m.view.phase === 'over');
+    a.send({ t: 'create', name: 'A2' });
+    const neu = await a.waitFor(m => m.t === 'joined' && m.roomId !== old.roomId);
+    // B 留在旧房看结果：旧房到期关闭，B 收到带 roomId 的 room_closed
+    const closed = await b.waitFor(m => m.t === 'room_closed', 3000);
+    assert.equal(closed.roomId, old.roomId);
+    assert.ok(!app.mm.rooms.has(old.roomId), '旧房已清理');
+    // B 用同一条 socket 加入 A 的新房（两个席位都再来一局）
+    b.send({ t: 'leave' });
+    b.send({ t: 'join', code: neu.code, name: 'B2' });
+    await b.waitFor(m => m.t === 'joined' && m.roomId === neu.roomId);
+    await new Promise(r => setTimeout(r, 400));   // 再越过一个保留期，确认旧房不会迟到地干扰
+    assert.equal(a.msgs.filter(m => m.t === 'room_closed').length, 0, '复用 socket 不应收到旧房 room_closed');
+    assert.equal([...a.msgs, ...b.msgs].filter(m => m.code === 'ALREADY_IN_ROOM').length, 0);
+    // 新房可行动
+    a.send({ t: 'intent', op: 'mulligan', uids: [] });
+    b.send({ t: 'intent', op: 'mulligan', uids: [] });
+    await a.waitFor(m => m.t === 'update' && m.view.roomId === neu.roomId && m.view.phase === 'play');
+    // 新房可重连：A 断开，新连接凭新房 token resume
+    await new Promise(r => { a.ws.once('close', r); a.ws.close(); });
+    await b.waitFor(m => m.t === 'opponent' && m.status === 'disconnected');
+    const a2 = await rawWs(url);
+    a2.send({ t: 'resume', token: neu.token });
+    const snap = await a2.waitFor(m => m.t === 'snapshot');
+    assert.equal(snap.view.roomId, neu.roomId); assert.equal(snap.view.phase, 'play');
+    await b.waitFor(m => m.t === 'opponent' && m.status === 'reconnected');
+    assert.ok(app.mm.rooms.has(neu.roomId));
+  } finally { await app.close(); }
+});
 
 test('两个 ws 客户端端到端打完一局：seq 连续、无信息泄露、双方视角一致、日志可回放', async () => {
   const app = await startApp();

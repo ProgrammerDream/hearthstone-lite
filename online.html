@@ -711,6 +711,7 @@ function handle(m) {
       if (m.status === 'reconnected') { toast('对手已重连'); }
       return;
     case 'room_closed':
+      if (m.roomId && S.roomId && m.roomId !== S.roomId) { return; }   // 上一局旧房的关闭通知，不影响当前房间
       clearRoom();
       showLobby(m.reason === 'left' ? '已离开房间' : m.reason === 'shutdown' ? '服务器重启了，请重新开局' : '房间已关闭');
       return;

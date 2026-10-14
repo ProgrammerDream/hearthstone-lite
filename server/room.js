@@ -282,7 +282,7 @@ export class Room {
       const p = this.players[seat];
       if (!p) { continue; }
       if (p.graceTimer) { clearTimeout(p.graceTimer); p.graceTimer = null; }
-      this.send(seat, { t: 'room_closed', reason });
+      this.send(seat, { t: 'room_closed', roomId: this.id, reason });
     }
     this.phase = RoomPhase.CLOSED;
     this.record({ actor: 'server', op: 'close', payload: { reason }, ok: true });
