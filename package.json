@@ -1,0 +1,18 @@
+{
+  "name": "hearthstone-lite",
+  "version": "0.4.0",
+  "private": true,
+  "type": "module",
+  "description": "炉石简化版：单文件前端 + Node.js/WebSocket 联网对战服务端（服务器权威、信息隐藏、断线重连、日志回放）",
+  "scripts": {
+    "start": "node server/index.js",
+    "test": "node --test \"server/test/*.test.js\"",
+    "e2e": "node server/test/e2e-clients.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
