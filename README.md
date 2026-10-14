@@ -50,7 +50,7 @@ deploy/               systemd unit + 部署脚本
 ### 协议（WebSocket JSON，`/ws`）
 
 - 客户端 → 服务端：`create{name}` / `join{code,name}` / `quick{name}` / `resume{token}` / `intent{op:'mulligan'|'play'|'attack'|'hero_power'|'end_turn', uid?, uids?, target?, reqId?}` / `sync` / `leave` / `ping`
-- 服务端 → 客户端：`hello` / `joined{roomId,code,seat,token,waiting}` / `snapshot{seq,view}` / `update{seq,actor,op,events,view}` / `error{code,reqId}` / `opponent{status,graceUntil}` / `room_closed` / `pong`
+- 服务端 → 客户端：`hello` / `joined{roomId,code,seat,token,waiting}` / `snapshot{seq,view}` / `update{seq,actor,op,events,view}` / `error{code,reqId}` / `opponent{status,graceUntil}` / `room_closed{roomId,reason}` / `pong`
 - `target`：`{type:'hero', side:'p1'|'p2'}` 或 `{type:'minion', uid}`
 
 ### 运行
@@ -62,7 +62,21 @@ PORT=8787 TURN_SECONDS=75 npm start        # http://localhost:8787/  （联机�
 node server/test/e2e-clients.js ws://127.0.0.1:8787/ws   # 对运行中的服务端跑一局，打印摘要
 ```
 
-部署（Ubuntu + systemd）：`bash deploy/deploy.sh`，服务名 `hearthstone-lite`，监听 `0.0.0.0:8787`。
+部署（Ubuntu + systemd）：`bash deploy/deploy.sh`，服务名 `hearthstone-lite`，监听 `0.0.0.0:8787`。测试直接使用退出码作为门禁，任何测试失败都会在服务重启之前停止；不得以 TAP/spec 文本匹配判断成功。用 `bash deploy/test-gate.sh` 验证失败不重启及不同输出格式下的成功路径。
+
+### 双人演示步骤
+
+1. 用两个不同的浏览器配置，或普通窗口 + 无痕窗口，各打开服务端的 `/online.html`。同一配置双标签共享 localStorage 重连 token，会把另一个标签的连接顶掉（4001）。
+2. 玩家 A 创建房间，将四位房间码交给玩家 B；B 输入房间码加入。
+3. 双方确认换牌，轮流出牌、攻击或结束回合，直至出现胜负。
+4. 对局中刷新其中一个窗口，可验证 token 重连；结束后选择“再来一局”，创建/加入新房。
+5. 离房时服务端解绑旧 socket；客户端只处理当前 roomId 的关闭通知，旧房清理不会清空新局。
+
+服务启停：`sudo systemctl stop hearthstone-lite` / `sudo systemctl restart hearthstone-lite`。工作树 SHA、运行进程、healthz、完整 WS 对局和浏览器对局应分别核对；仅测试通过不等于上线验收通过。
+
+### MVP 已知限制
+
+房间和重连席位在内存中，服务重启会结束当前对局；终局日志写入服务端 logs。32 位种子与公开 PRNG 仍存在离线推断隐藏牌的设计风险，进行中的 replay digest 会帮助验证猜测；未完成攻击验证及 RNG 加固。本项目适合作品演示，尚未验证高并发、长期稳定性或生产级反作弊。
 
 ## 本地运行
 

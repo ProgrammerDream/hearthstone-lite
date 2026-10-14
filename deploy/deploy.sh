@@ -41,7 +41,9 @@ echo "== 3. 依赖（仅生产依赖：ws）"
 npm ci --omit=dev --no-audit --no-fund
 
 echo "== 4. 自测"
-npm test 2>&1 | grep -E "^ℹ (tests|pass|fail)" || true
+# Trust the process status, not reporter text (TAP/spec differ over SSH).
+# With set -e, a failed test stops here before any service changes.
+npm test
 
 echo "== 5. systemd"
 sudo install -m 644 deploy/hearthstone-lite.service "/etc/systemd/system/${UNIT}.service"

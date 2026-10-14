@@ -144,6 +144,8 @@ test('两个 ws 客户端端到端打完一局：seq 连续、无信息泄露、
     assert.equal(a.view.phase, 'over');
     assert.equal(a.view.result.reason, 'hp');
     assert.equal(a.view.turnDeadline, null);
+    // 机器人可能刚耗尽连接令牌（20/s）；先恢复至少一个令牌，检查游戏规则而非传输限流。
+    await new Promise(resolve => setTimeout(resolve, 75));
     // 终局后操作被拒
     a.send({ t: 'intent', reqId: 'after', op: 'end_turn' });
     const e = await a.waitFor(m => m.t === 'error' && m.reqId === 'after');
